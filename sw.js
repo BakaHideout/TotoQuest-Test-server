@@ -1,11 +1,12 @@
-const CACHE_NAME = 'TotoQuestTestServerV5';
+const CACHE_NAME = 'totoquest-v2';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).catch(()=>{})
   );
-  self.skipWaiting();
+  // Intentionally no self.skipWaiting() here — the new version waits until the
+  // player taps the in-app "Update available" banner before taking over.
 });
 
 self.addEventListener('activate', (event) => {
@@ -17,8 +18,18 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch', (event) => {
+  // Network-first for the app shell so a new deploy is detected promptly;
+  // falls back to the cached copy when offline.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request).then((resp) => {
+      const copy = resp.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(()=>{});
+      return resp;
+    }).catch(() => caches.match(event.request))
   );
 });

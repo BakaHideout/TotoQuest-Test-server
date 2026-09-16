@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#120c1f">
-<meta name="totoquest-version" content="2026.09.16.2">
-
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,6 +16,14 @@
   body { display:flex; align-items:center; justify-content:center; }
   #toto-root { max-width:100vw !important; height:100vh !important; border-radius:0 !important; }
   @media (min-width: 500px){ #toto-root { max-width:480px !important; height:860px !important; border-radius:26px !important; } }
+  #tq-update-banner {
+    position:fixed; left:12px; right:12px; bottom:16px; z-index:99999;
+    background:linear-gradient(135deg,#ff8a3d,#ff5f6d); color:#fff; font-family:'Baloo 2','Segoe UI',sans-serif;
+    font-weight:800; font-size:14px; padding:13px 16px; border-radius:14px; text-align:center;
+    box-shadow:0 10px 28px rgba(0,0,0,0.4); cursor:pointer; display:none;
+  }
+  #tq-update-banner.show { display:block; animation: tqSlideUp 0.35s ease-out; }
+  @keyframes tqSlideUp { from{ transform:translateY(30px); opacity:0;} to{ transform:translateY(0); opacity:1;} }
 </style>
 </head>
 <body>
@@ -244,6 +250,8 @@
   .btn-attack:active { transform: scale(0.96); }
   .btn-swap { padding:16px 12px; border-radius:14px; border:none; background:rgba(255,255,255,0.15); color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; }
 
+  .toni-glow { filter: drop-shadow(0 0 10px rgba(255,30,30,0.85)) drop-shadow(0 0 22px rgba(255,0,0,0.6)); animation: toniPulse 1.5s ease-in-out infinite; }
+  @keyframes toniPulse { 0%,100%{ filter: drop-shadow(0 0 8px rgba(255,30,30,0.75)) drop-shadow(0 0 16px rgba(255,0,0,0.5)); } 50%{ filter: drop-shadow(0 0 16px rgba(255,20,20,1)) drop-shadow(0 0 32px rgba(255,0,0,0.85)); } }
   .toast { position:absolute; bottom:96px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#fff; padding:8px 16px; border-radius:20px; font-size:12.5px; font-weight:700; z-index:80; opacity:0; transition:opacity 0.25s; pointer-events:none;}
   .toast.show { opacity:1; }
 </style>
@@ -334,6 +342,7 @@
         <div class="hud-stack">
           <div class="hud-chip">⚡ <span id="hud-energy">100</span></div>
           <div class="hud-chip">📍 <span id="hud-nearby">0</span> nearby</div>
+          <button class="hud-chip" id="btn-leaderboard" style="border:none; cursor:pointer;">🏆 Leaderboard</button>
         </div>
       </div>
 
@@ -341,6 +350,7 @@
         <div class="clouds" id="clouds"></div>
         <div class="world" id="world">
           <div id="road-layer"></div>
+          <div id="building-layer"></div>
           <div id="deco-layer"></div>
           <div id="toto-layer"></div>
           <div id="gym-layer"></div>
@@ -407,6 +417,7 @@
           <div><div style="font-weight:800; font-size:16px;" id="profile-name">Trainer</div><div style="font-size:12px; color:#888;" id="profile-email">email</div></div>
         </div>
         <div class="stat-row"><span>Energy</span><span id="profile-energy">100</span></div>
+        <div class="stat-row"><span>Power Level</span><span id="profile-power" style="color:#ff8a3d;">0</span></div>
         <div class="stat-row"><span>Totos caught</span><span id="profile-count">0</span></div>
         <div class="stat-row"><span>Gender</span><span id="profile-gender">-</span></div>
         <div class="stat-row"><span>Age</span><span id="profile-age">-</span></div>
@@ -452,6 +463,16 @@
         <button class="btn-cancel" data-close-enc>Run</button>
         <button class="btn-catch" id="btn-throw">🔮 Throw</button>
       </div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="modal-back" id="leaderboard-modal">
+    <div class="modal-card" style="max-width:360px; text-align:left;">
+      <div class="modal-name" style="text-align:center; margin-bottom:2px;">🏆 Power Leaderboard</div>
+      <div class="modal-sub" style="text-align:center;">Ranked by your strongest 6 Totos' combined CP</div>
+      <div id="leaderboard-list" style="max-height:340px; overflow-y:auto; margin-top:8px;"></div>
+      <button class="btn-cancel" style="width:100%; margin-top:10px;" data-close-leaderboard>Close</button>
     </div>
   </div>
 
@@ -519,6 +540,7 @@
   const GYM_RADIUS_M = 40;
   const WILD_RADIUS_M = 60;
   const DEFAULT_LAT = 42.9587, DEFAULT_LON = -83.8394; // Swartz Creek, MI — used only if real GPS can't be reached
+  const ZOOM_MIN = 0.6, ZOOM_MAX = 1.9, TILT_MAX = 58;
 
   function rand(seed){ const x = Math.sin(seed) * 10000; return x - Math.floor(x); }
   function uid(){ return 'id'+Date.now()+Math.floor(Math.random()*100000); }
@@ -537,6 +559,11 @@
     const [name, sprite] = pool[Math.floor(Math.random()*pool.length)];
     const cp = rollCP(tier); const s = statsFromCp(cp);
     return { id:uid(), name, sprite, tier, cp, level:1, maxHp:s.maxHp, hp:s.maxHp, atk:s.atk, strength:s.strength, def:s.def, spd:s.spd, maxEnergy:s.maxEnergy, energy:s.maxEnergy };
+  }
+  // Toni — a custom Eternal, always guarding the first Challenger shrine so she's easy to find.
+  function makeToniGuardian(){
+    const cp = 20000; const s = statsFromCp(cp);
+    return { id:uid(), name:'Toni', sprite:'🎃', tier:'eternal', level:1, cp, maxHp:s.maxHp, hp:s.maxHp, atk:s.atk, strength:s.strength, def:s.def, spd:s.spd, maxEnergy:s.maxEnergy, energy:s.maxEnergy, isToni:true };
   }
   function powerUpCost(t){ return Math.round(150 + t.cp*0.55); }
   function applyPowerUp(t){
@@ -702,11 +729,55 @@
     locate();
     await saveNow(true);
   }
-  function refreshHUD(){ $('#hud-energy').textContent = state.energy; $('#profile-energy').textContent = state.energy; $('#profile-count').textContent = state.collection.length; }
+  function computePowerLevel(){
+    return state.collection.slice().sort((a,b)=>b.cp-a.cp).slice(0,6).reduce((sum,t)=>sum+t.cp,0);
+  }
+  function refreshHUD(){
+    $('#hud-energy').textContent = state.energy; $('#profile-energy').textContent = state.energy; $('#profile-count').textContent = state.collection.length;
+    state.powerLevel = computePowerLevel();
+    $('#profile-power').textContent = state.powerLevel.toLocaleString();
+    updateLeaderboard();
+  }
+  async function updateLeaderboard(){
+    if (!hasCloudStorage || !state.loggedIn) return;
+    try {
+      const cur = await window.storage.get('totoquest-leaderboard', true);
+      let board = {};
+      if (cur && cur.value){ try { board = JSON.parse(cur.value); } catch(e){ board={}; } }
+      board[state.email] = { username: state.username, avatar: state.avatar, powerLevel: state.powerLevel };
+      await window.storage.set('totoquest-leaderboard', JSON.stringify(board), true);
+    } catch(e){ console.warn('leaderboard update failed', e); }
+  }
+  async function loadLeaderboard(){
+    const list = $('#leaderboard-list');
+    if (!hasCloudStorage){
+      list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Cross-player leaderboards need the hosted Claude version — this downloaded copy can only show your own power level: <b>'+(state.powerLevel||0).toLocaleString()+'</b>.</p>';
+      return;
+    }
+    list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Loading…</p>';
+    try {
+      const res = await window.storage.get('totoquest-leaderboard', true);
+      let board = {};
+      if (res && res.value){ try { board = JSON.parse(res.value); } catch(e){} }
+      const rows = Object.entries(board).map(([email,v])=>({email, ...v})).sort((a,b)=>b.powerLevel-a.powerLevel);
+      if (!rows.length){ list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">No trainers on the board yet.</p>'; return; }
+      list.innerHTML = rows.map((r,i)=>{
+        const isMe = r.email===state.email;
+        const av = r.avatar==='male' ? '🧙‍♂️' : '🧙‍♀️';
+        return '<div class="toto-card" style="display:flex; align-items:center; gap:10px; text-align:left; margin-bottom:8px;'+(isMe?' border:2px solid #ff8a3d;':'')+'">'+
+          '<div style="font-weight:800; width:22px;">'+(i+1)+'</div>'+
+          '<div style="font-size:24px;">'+av+'</div>'+
+          '<div style="flex:1;"><div class="nm" style="font-size:13px;">'+r.username+(isMe?' (you)':'')+'</div></div>'+
+          '<div style="font-weight:800; color:#ff8a3d;">'+r.powerLevel.toLocaleString()+'</div>'+
+        '</div>';
+      }).join('');
+    } catch(e){ list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Could not load the leaderboard right now.</p>'; }
+  }
 
   // ---------------- GEO / WORLD / CAMERA ----------------
   let watchId = null, simulateMode = false, lastMoveTs = Date.now(), idleCheckTimer = null;
-  state.cameraZoom = 1; state.cameraRotate = 0; state.cameraTilt = 0; state.worldOffset = {x:0,y:0}; state.playerWorldPos = {x:WORLD_CENTER, y:WORLD_CENTER};
+  state.cameraRotate = 0; state.worldOffset = {x:0,y:0}; state.playerWorldPos = {x:WORLD_CENTER, y:WORLD_CENTER};
+  state.cameraZoom = 1; state.cameraTilt = TILT_MAX * (1-ZOOM_MIN)/(ZOOM_MAX-ZOOM_MIN);
 
   function metersDelta(lat0, lon0, lat1, lon1){
     const mPerDegLat = 110540, mPerDegLon = 111320 * Math.cos(lat0*Math.PI/180);
@@ -809,41 +880,72 @@
     };
   });
 
-  // Camera zoom / rotate
-  $('#btn-zoom-in').onclick = ()=>{ state.cameraZoom = Math.min(1.8, state.cameraZoom+0.15); applyWorldTransform(); };
-  $('#btn-zoom-out').onclick = ()=>{ state.cameraZoom = Math.max(0.6, state.cameraZoom-0.15); applyWorldTransform(); };
+  // Camera zoom/tilt are the same gesture, Pokemon GO style: zooming in also lowers the
+  // camera to ground level so you can see further down the road; zooming out returns to
+  // the flat sky view. Rotation is a separate, single-finger left/right swipe.
+  function setZoom(z){
+    state.cameraZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+    const t = (state.cameraZoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN);
+    state.cameraTilt = TILT_MAX * t;
+    applyWorldTransform();
+  }
+  $('#btn-zoom-in').onclick = ()=> setZoom(state.cameraZoom + 0.15);
+  $('#btn-zoom-out').onclick = ()=> setZoom(state.cameraZoom - 0.15);
   $('#btn-rotate-l').onclick = ()=>{ state.cameraRotate = (state.cameraRotate-20+360)%360; applyWorldTransform(); };
   $('#btn-rotate-r').onclick = ()=>{ state.cameraRotate = (state.cameraRotate+20)%360; applyWorldTransform(); };
 
-  // Drag/swipe anywhere on the map background to look around: horizontal = rotate,
-  // vertical = tilt the camera angle (swipe down for an angled view, up for sky view).
+  // Single finger = swipe left/right to turn around your character.
+  // Two fingers = pinch out to zoom into ground level, pinch in to return to sky view.
   (function setupLookAround(){
     const mapView = $('#map-view');
     mapView.style.touchAction = 'none';
-    let drag = null;
-    const ROTATE_SENSITIVITY = 0.6; // degrees per pixel dragged horizontally
-    const TILT_SENSITIVITY = 0.35;  // degrees per pixel dragged vertically
-    const TILT_MIN = 0, TILT_MAX = 62;
+    const ROTATE_SENSITIVITY = 0.5; // degrees per pixel dragged horizontally
+    const activePointers = new Map();
+    let rotateDrag = null;
+    let pinchState = null;
+
+    function distanceBetween(pts){ return Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y); }
+
     mapView.addEventListener('pointerdown', (e)=>{
       if (e.target.closest('.toto-node, .gym-node, .map-controls, .dpad')) return;
-      drag = { startX: e.clientX, startY: e.clientY, startRotate: state.cameraRotate, startTilt: state.cameraTilt, pointerId: e.pointerId };
+      activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
       try { mapView.setPointerCapture(e.pointerId); } catch(err){}
+      if (activePointers.size===1){
+        rotateDrag = { startX:e.clientX, startRotate: state.cameraRotate, pointerId:e.pointerId };
+        pinchState = null;
+      } else if (activePointers.size===2){
+        rotateDrag = null;
+        const pts = Array.from(activePointers.values());
+        pinchState = { startDist: distanceBetween(pts), startZoom: state.cameraZoom };
+      }
     });
     mapView.addEventListener('pointermove', (e)=>{
-      if (!drag || e.pointerId !== drag.pointerId) return;
-      const dx = e.clientX - drag.startX;
-      const dy = e.clientY - drag.startY;
-      let r = (drag.startRotate + dx*ROTATE_SENSITIVITY) % 360;
-      if (r < 0) r += 360;
-      state.cameraRotate = r;
-      let t = drag.startTilt + dy*TILT_SENSITIVITY; // swipe down (dy>0) tilts further; swipe up flattens
-      state.cameraTilt = Math.max(TILT_MIN, Math.min(TILT_MAX, t));
-      applyWorldTransform();
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+      if (activePointers.size>=2 && pinchState){
+        const pts = Array.from(activePointers.values());
+        const ratio = distanceBetween(pts) / pinchState.startDist;
+        setZoom(pinchState.startZoom * ratio);
+      } else if (rotateDrag && e.pointerId===rotateDrag.pointerId){
+        const dx = e.clientX - rotateDrag.startX;
+        let r = (rotateDrag.startRotate + dx*ROTATE_SENSITIVITY) % 360;
+        if (r < 0) r += 360;
+        state.cameraRotate = r;
+        applyWorldTransform();
+      }
     });
-    function endDrag(e){ if (drag && (!e || e.pointerId===drag.pointerId)) drag=null; }
-    mapView.addEventListener('pointerup', endDrag);
-    mapView.addEventListener('pointercancel', endDrag);
-    mapView.addEventListener('pointerleave', endDrag);
+    function releasePointer(e){
+      activePointers.delete(e.pointerId);
+      if (activePointers.size < 2) pinchState = null;
+      if (rotateDrag && e.pointerId===rotateDrag.pointerId) rotateDrag = null;
+      if (activePointers.size===1){
+        const entry = Array.from(activePointers.entries())[0];
+        rotateDrag = { startX: entry[1].x, startRotate: state.cameraRotate, pointerId: entry[0] };
+      }
+    }
+    mapView.addEventListener('pointerup', releasePointer);
+    mapView.addEventListener('pointercancel', releasePointer);
+    mapView.addEventListener('pointerleave', releasePointer);
   })();
 
   function distanceMetersToWorldPoint(x, y){ return Math.hypot(x-state.playerWorldPos.x, y-state.playerWorldPos.y)/GPS_SCALE; }
@@ -853,16 +955,16 @@
     (state.shrines||[]).forEach(s=>{ if (s._distEl) s._distEl.textContent = Math.round(distanceMetersToWorldPoint(s.x,s.y))+'m'; });
   }
 
-  // ---------------- WORLD BUILD (decor/spawns) + LIVE ROADS ----------------
+  // ---------------- WORLD BUILD (decor/spawns) + LIVE ROADS/BUILDINGS/PARKS ----------------
   function buildWorld(){
     const {lat, lon} = state.geoAnchor;
     const baseSeed = Math.abs(Math.floor((lat*10000) + (lon*10000)));
 
-    // Roads are drawn strictly from real GPS-matched data — no roads are shown unless
-    // we can verify they actually exist at this location. Cleared here so a slow/failed
-    // fetch never leaves a road where there isn't one in real life.
+    // Roads and buildings are drawn strictly from real GPS-matched data — nothing is shown
+    // unless we can verify it actually exists at this location. Cleared here so a slow or
+    // failed fetch never leaves a road/building that doesn't exist in real life.
     $('#road-layer').innerHTML = '';
-    fetchRealRoads(lat, lon).catch(()=>{});
+    $('#building-layer').innerHTML = '';
 
     const decoLayer = $('#deco-layer'); decoLayer.innerHTML='';
     const decoEmojis = ['🌳','🌳','🌲','🌸','🪨','🍄','🌷','💧','🪵'];
@@ -890,53 +992,74 @@
     }
     $('#hud-nearby').textContent = nearbyCount;
 
-    const gymLayer = $('#gym-layer'); gymLayer.innerHTML=''; state.gyms = [];
+    // Gyms start out placed procedurally (always walkable, always on-canvas) so the game
+    // is playable immediately — fetchRealMapData will move them onto real nearby parks
+    // if any are found, same idea Pokemon GO uses (public, permanent, notable places —
+    // we use OpenStreetMap's park/leisure tags as the nearest open-data equivalent).
     const gymNames = ['Ashfall Arena','Frostpeak Ring','Thunder Colosseum','Bramble Pit'];
-    const GYM_MIN_PX = GYM_RADIUS_M*3*GPS_SCALE;   // always further than the interaction radius — you must walk
-    const GYM_MAX_PX = 600;                         // stays within the walkable patch and on-canvas
+    const GYM_MIN_PX = GYM_RADIUS_M*3*GPS_SCALE;
+    const GYM_MAX_PX = 600;
+    state.gyms = [];
     for (let i=0;i<3;i++){
       const s = baseSeed + i*555.1;
       const angle = rand(s)*Math.PI*2;
       const radius = GYM_MIN_PX + rand(s+1)*(GYM_MAX_PX-GYM_MIN_PX);
-      const x = WORLD_CENTER + Math.cos(angle)*radius;
-      const y = WORLD_CENTER + Math.sin(angle)*radius;
       const boss = makeToto(rand(s+2)<0.5 ? 'legendary' : 'mythical');
-      const gym = {id:uid(), x, y, boss, name: gymNames[i%gymNames.length]};
-      state.gyms.push(gym);
-      const ring = document.createElement('div'); ring.className='gym-radius';
-      const ringPx = GYM_RADIUS_M*2*GPS_SCALE;
-      ring.style.width=ringPx+'px'; ring.style.height=ringPx+'px'; ring.style.left=x+'px'; ring.style.top=(y-14)+'px';
-      gymLayer.appendChild(ring);
-      const node = document.createElement('div'); node.className='gym-node';
-      node.style.left=x+'px'; node.style.top=y+'px';
-      node.innerHTML = '<div class="bubble">🏟️</div><div class="gym-label">'+gym.name+'</div><div class="dist-tag">…m</div>';
-      gym._distEl = node.querySelector('.dist-tag');
-      node.onclick = ()=> tryStartGymRaid(gym);
-      gymLayer.appendChild(node);
+      state.gyms.push({ id:uid(), x: WORLD_CENTER+Math.cos(angle)*radius, y: WORLD_CENTER+Math.sin(angle)*radius, boss, name: gymNames[i%gymNames.length], atPark:false });
     }
+    renderGymMarkers();
 
     // Challenger shrines hold the Eternal guardians — these are always battle-ready, no walking required.
     const shrineLayer = $('#shrine-layer'); shrineLayer.innerHTML=''; state.shrines = [];
-    const shrineNames = ['Hollow Spire','Bone Cairn','Crypt Tower','Ashen Shrine'];
+    const shrineNames = ['Crypt Tower','Ashen Shrine'];
     for (let i=0;i<3;i++){
       const s = baseSeed + i*777.3; const x = 300+rand(s)*800; const y = 300+rand(s+1)*800;
-      const guardian = makeToto('eternal'); guardian.name = shrineNames[i%shrineNames.length]+' Guardian';
-      const shrine = {id:uid(), x, y, guardian, name: shrineNames[i%shrineNames.length]};
+      const guardian = (i===0) ? makeToniGuardian() : makeToto('eternal');
+      if (!guardian.isToni) guardian.name = shrineNames[i%shrineNames.length]+' Guardian';
+      const shrineName = guardian.isToni ? "Toni's Hollow" : shrineNames[i%shrineNames.length];
+      const shrine = {id:uid(), x, y, guardian, name: shrineName};
       state.shrines.push(shrine);
       const node = document.createElement('div'); node.className='gym-node';
       node.style.left=x+'px'; node.style.top=y+'px';
-      node.innerHTML = '<div class="bubble">🕯️</div><div class="gym-label">'+shrine.name+'</div><div class="dist-tag">…m</div>';
+      node.innerHTML = '<div class="bubble'+(guardian.isToni?' toni-glow':'')+'">'+guardian.sprite+'</div><div class="gym-label">'+shrine.name+'</div><div class="dist-tag">…m</div>';
       shrine._distEl = node.querySelector('.dist-tag');
       node.onclick = ()=> openBattleSetup({ type:'challenge', shrine });
       shrineLayer.appendChild(node);
     }
     refreshNodeDistances();
     renderChallenger(); renderBattleList();
+
+    fetchRealMapData(lat, lon).catch(e=>console.warn('map data fetch failed', e));
   }
 
-  async function fetchRealRoads(lat, lon){
-    const d = 0.0038; // ~400m box
-    const query = '[out:json][timeout:8];way["highway"]('+ (lat-d) +','+(lon-d)+','+(lat+d)+','+(lon+d)+');out geom;';
+  function renderGymMarkers(){
+    const gymLayer = $('#gym-layer'); gymLayer.innerHTML='';
+    (state.gyms||[]).forEach(gym=>{
+      const ring = document.createElement('div'); ring.className='gym-radius';
+      const ringPx = GYM_RADIUS_M*2*GPS_SCALE;
+      ring.style.width=ringPx+'px'; ring.style.height=ringPx+'px'; ring.style.left=gym.x+'px'; ring.style.top=(gym.y-14)+'px';
+      gymLayer.appendChild(ring);
+      const node = document.createElement('div'); node.className='gym-node';
+      node.style.left=gym.x+'px'; node.style.top=gym.y+'px';
+      node.innerHTML = '<div class="bubble">'+(gym.atPark?'🌳':'🏟️')+'</div><div class="gym-label">'+gym.name+'</div><div class="dist-tag">…m</div>';
+      gym._distEl = node.querySelector('.dist-tag');
+      node.onclick = ()=> tryStartGymRaid(gym);
+      gymLayer.appendChild(node);
+    });
+    refreshNodeDistances();
+  }
+
+  async function fetchRealMapData(lat, lon){
+    const d = 0.0038; // ~400m box for roads/buildings
+    const bbox = (lat-d)+','+(lon-d)+','+(lat+d)+','+(lon+d);
+    const query = '[out:json][timeout:10];('
+      +'way["highway"]('+bbox+');'
+      +'way["building"]('+bbox+');'
+      +'way["leisure"="park"](around:1200,'+lat+','+lon+');'
+      +'way["leisure"="garden"](around:1200,'+lat+','+lon+');'
+      +'way["landuse"="recreation_ground"](around:1200,'+lat+','+lon+');'
+      +'node["leisure"="park"](around:1200,'+lat+','+lon+');'
+      +');out geom;';
     const endpoints = [
       'https://overpass-api.de/api/interpreter',
       'https://overpass.kumi.systems/api/interpreter'
@@ -945,7 +1068,7 @@
     for (const base of endpoints){
       const url = base+'?data='+encodeURIComponent(query);
       const ctrl = new AbortController();
-      const timer = setTimeout(()=>ctrl.abort(), 8000);
+      const timer = setTimeout(()=>ctrl.abort(), 9000);
       try {
         const resp = await fetch(url, {signal: ctrl.signal});
         clearTimeout(timer);
@@ -954,32 +1077,84 @@
         break;
       } catch(e){
         clearTimeout(timer);
-        console.warn('Road data endpoint failed, trying next:', e);
+        console.warn('Map data endpoint failed, trying next:', e);
       }
     }
     if (!data || !data.elements || !data.elements.length){
-      // Real road data genuinely unavailable here — leave the terrain open rather than
-      // inventing a road that doesn't exist at this location.
-      showToast('Could not verify real roads here — showing open terrain');
+      showToast('Could not verify real roads/buildings here — showing open terrain');
       return;
     }
-    const smallRoads = new Set(['footway','path','pedestrian','track','cycleway','steps']);
-    let svg = '<svg id="road-svg" viewBox="0 0 1400 1400">';
-    data.elements.forEach(el=>{
-      if (!el.geometry || el.geometry.length<2) return;
-      const pts = el.geometry.map(pt=>{
-        const md = metersDelta(lat, lon, pt.lat, pt.lon);
-        return (WORLD_CENTER+md.east*GPS_SCALE).toFixed(1)+','+(WORLD_CENTER-md.north*GPS_SCALE).toFixed(1);
-      }).join(' ');
-      const isSmall = smallRoads.has((el.tags&&el.tags.highway)||'');
-      const width = isSmall ? 10 : 28;
-      const color = isSmall ? '#f1e6c8' : '#e8d9b5';
-      svg += '<polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round" stroke-linejoin="round"/>';
-    });
-    svg += '</svg>';
-    // Only replace once we know we actually have usable geometry.
-    const layer = $('#road-layer'); layer.innerHTML = svg;
-    showToast('Loaded real roads for this area');
+    const project = (ptLat, ptLon)=>{
+      const md = metersDelta(lat, lon, ptLat, ptLon);
+      return { x: WORLD_CENTER+md.east*GPS_SCALE, y: WORLD_CENTER-md.north*GPS_SCALE };
+    };
+    const centroidOf = (el)=>{
+      if (el.type==='node') return project(el.lat, el.lon);
+      if (!el.geometry || !el.geometry.length) return null;
+      let sx=0, sy=0;
+      el.geometry.forEach(pt=>{ const p = project(pt.lat, pt.lon); sx+=p.x; sy+=p.y; });
+      return { x: sx/el.geometry.length, y: sy/el.geometry.length };
+    };
+
+    // --- Roads ---
+    const roadEls = data.elements.filter(el=>el.tags && el.tags.highway && el.geometry && el.geometry.length>=2);
+    if (roadEls.length){
+      const smallRoads = new Set(['footway','path','pedestrian','track','cycleway','steps']);
+      let svg = '<svg id="road-svg" viewBox="0 0 1400 1400">';
+      roadEls.forEach(el=>{
+        const pts = el.geometry.map(pt=>{ const p = project(pt.lat, pt.lon); return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' ');
+        const isSmall = smallRoads.has(el.tags.highway);
+        svg += '<polyline points="'+pts+'" fill="none" stroke="'+(isSmall?'#f1e6c8':'#e8d9b5')+'" stroke-width="'+(isSmall?10:28)+'" stroke-linecap="round" stroke-linejoin="round"/>';
+      });
+      svg += '</svg>';
+      $('#road-layer').innerHTML = svg;
+    }
+
+    // --- Buildings ---
+    const buildingIcon = (tagVal)=>{
+      if (['apartments','dormitory'].includes(tagVal)) return '🏢';
+      if (['retail','commercial','shop','supermarket'].includes(tagVal)) return '🏪';
+      if (tagVal==='school'||tagVal==='university') return '🏫';
+      if (tagVal==='church'||tagVal==='cathedral') return '⛪';
+      if (tagVal==='industrial'||tagVal==='warehouse') return '🏭';
+      return '🏠';
+    };
+    let buildingEls = data.elements
+      .filter(el=>el.tags && el.tags.building)
+      .map(el=>{ const c = centroidOf(el); return c ? {c, tag: el.tags.building} : null; })
+      .filter(Boolean);
+    buildingEls.sort((a,b)=> Math.hypot(a.c.x-WORLD_CENTER,a.c.y-WORLD_CENTER) - Math.hypot(b.c.x-WORLD_CENTER,b.c.y-WORLD_CENTER));
+    buildingEls = buildingEls.slice(0, 45);
+    if (buildingEls.length){
+      const bLayer = $('#building-layer'); bLayer.innerHTML='';
+      buildingEls.forEach(b=>{
+        const el = document.createElement('div'); el.className='deco';
+        el.style.left=b.c.x+'px'; el.style.top=b.c.y+'px'; el.style.fontSize='24px';
+        el.textContent = buildingIcon(b.tag);
+        bLayer.appendChild(el);
+      });
+    }
+
+    // --- Parks → gym locations, the closest open-data equivalent of how Pokemon GO
+    // sources its stops/gyms from notable public places ---
+    let parkEls = data.elements
+      .filter(el=> el.tags && (el.tags.leisure==='park' || el.tags.leisure==='garden' || el.tags.landuse==='recreation_ground'))
+      .map(centroidOf)
+      .filter(Boolean);
+    if (parkEls.length){
+      // De-dupe parks that are basically on top of each other, then take the closest few.
+      const deduped = [];
+      parkEls.forEach(p=>{
+        if (!deduped.some(q=>Math.hypot(p.x-q.x,p.y-q.y) < 60)) deduped.push(p);
+      });
+      deduped.sort((a,b)=> Math.hypot(a.x-WORLD_CENTER,a.y-WORLD_CENTER) - Math.hypot(b.x-WORLD_CENTER,b.y-WORLD_CENTER));
+      let moved = 0;
+      for (let i=0; i<deduped.length && i<state.gyms.length; i++){
+        state.gyms[i].x = deduped[i].x; state.gyms[i].y = deduped[i].y; state.gyms[i].atPark = true;
+        moved++;
+      }
+      if (moved){ renderGymMarkers(); showToast(moved+' gym'+(moved>1?'s':'')+' placed at real nearby parks'); }
+    }
   }
 
   function spawnClouds(){
@@ -1007,7 +1182,7 @@
     if (state.collection.length===0){ grid.innerHTML = '<p style="grid-column:1/-1; color:#999; font-weight:700; font-size:13px;">No Totos yet — battle a wild Toto on the map to catch one.</p>'; return; }
     state.collection.slice().sort((a,b)=>b.cp-a.cp).forEach(t=>{
       const card = document.createElement('div'); card.className='toto-card';
-      card.innerHTML = '<div class="sp">'+t.sprite+'</div><div class="nm">'+t.name+'</div><div class="lv">Lv.'+t.level+'</div><div class="cp">CP '+t.cp+'</div><div class="tier-badge tier-'+t.tier+'">'+t.tier+'</div>';
+      card.innerHTML = '<div class="sp'+(t.isToni?' toni-glow':'')+'">'+t.sprite+'</div><div class="nm">'+t.name+'</div><div class="lv">Lv.'+t.level+'</div><div class="cp">CP '+t.cp+'</div><div class="tier-badge tier-'+t.tier+'">'+t.tier+'</div>';
       card.onclick = ()=> openDetail(t.id);
       grid.appendChild(card);
     });
@@ -1024,7 +1199,7 @@
   function shrineRowHtml(sh){
     const distM = state.geoAnchor ? Math.round(distanceMetersToWorldPoint(sh.x, sh.y)) : 0;
     return '<div class="toto-card shrine-row" data-shrine="'+sh.id+'">'+
-      '<div class="sp">'+sh.guardian.sprite+'</div>'+
+      '<div class="sp'+(sh.guardian.isToni?' toni-glow':'')+'">'+sh.guardian.sprite+'</div>'+
       '<div class="info"><div class="nm" style="font-size:13px;">'+sh.name+'</div><div class="cp">Guardian: '+sh.guardian.name+' · CP '+sh.guardian.cp+'</div></div>'+
       '<div><span class="range-tag range-in">'+distM+'m · Ready</span></div>'+
     '</div>';
@@ -1112,6 +1287,9 @@
   });
   $('#btn-admin-energy').onclick = ()=>{ state.energy += 1000000; refreshHUD(); markDirty(); saveNow(false); showToast('Admin: +1,000,000 energy'); };
 
+  $('#btn-leaderboard').onclick = ()=>{ $('#leaderboard-modal').classList.add('active'); loadLeaderboard(); };
+  $('[data-close-leaderboard]').onclick = ()=> $('#leaderboard-modal').classList.remove('active');
+
   // ---------------- LOGOUT ----------------
   $('#btn-logout').onclick = async ()=>{
     await saveNow(true); stopAutosave();
@@ -1193,7 +1371,7 @@
   // ================= BATTLE SCREEN =================
   let battle = null;
   function fighterFromToto(t){
-    return { ref:t, name:t.name, sprite:t.sprite, level:t.level, cp:t.cp, tier:t.tier, maxHp:t.maxHp, hp:t.maxHp, atk:t.atk, strength:t.strength, def:t.def, spd:t.spd, maxEnergy:t.maxEnergy, energy:t.maxEnergy };
+    return { ref:t, name:t.name, sprite:t.sprite, level:t.level, cp:t.cp, tier:t.tier, maxHp:t.maxHp, hp:t.maxHp, atk:t.atk, strength:t.strength, def:t.def, spd:t.spd, maxEnergy:t.maxEnergy, energy:t.maxEnergy, isToni:!!t.isToni };
   }
   function strongestToto(){ return state.collection.length ? state.collection.slice().sort((a,b)=>b.cp-a.cp)[0] : null; }
 
@@ -1229,6 +1407,7 @@
     $('#bf-p-name').textContent=p.name; $('#bf-p-cp').textContent='CP '+p.cp; $('#bf-p-level').textContent='Lv.'+p.level; $('#bf-p-sprite').textContent=p.sprite;
     $('#bf-p-hp').style.width=Math.max(0,(p.hp/p.maxHp*100))+'%'; $('#bf-p-nrg').style.width=Math.max(0,(p.energy/p.maxEnergy*100))+'%';
     $('#bf-e-name').textContent=e.name; $('#bf-e-cp').textContent='CP '+e.cp; $('#bf-e-level').textContent=e.tier; $('#bf-e-sprite').textContent=e.sprite;
+    $('#bf-e-sprite').classList.toggle('toni-glow', !!e.isToni);
     $('#bf-e-hp').style.width=Math.max(0,(e.hp/e.maxHp*100))+'%';
   }
   function battleLog(msg){ $('#battle-log').textContent = msg; }
@@ -1319,131 +1498,41 @@
 })();
 </script>
 
-<!-- TotoQuest automatic update system -->
+<div id="tq-update-banner">🔄 A new version of TotoQuest is available — tap to update</div>
 <script>
-(function () {
-  const TOTOQUEST_VERSION = '2026.09.16.1';
-  const UPDATE_CHECK_INTERVAL = 60 * 1000;
+(function(){
+  if (!('serviceWorker' in navigator)) return;
+  var banner = document.getElementById('tq-update-banner');
+  var refreshing = false;
 
-  function showUpdatePrompt() {
-    if (document.getElementById('totoquest-update-prompt')) return;
-
-    const overlay = document.createElement('div');
-    overlay.id = 'totoquest-update-prompt';
-    overlay.innerHTML = `
-      <div style="
-        position:fixed;
-        inset:0;
-        z-index:999999;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        padding:20px;
-        background:rgba(10,8,20,.78);
-        backdrop-filter:blur(5px);
-        font-family:'Segoe UI',system-ui,sans-serif;
-      ">
-        <div style="
-          width:min(360px,100%);
-          background:linear-gradient(145deg,#2b1f47,#120c1f);
-          color:#fff;
-          border:2px solid #7b5cff;
-          border-radius:22px;
-          padding:24px 20px;
-          text-align:center;
-          box-shadow:0 18px 60px rgba(0,0,0,.55);
-        ">
-          <div style="font-size:42px;margin-bottom:6px;">🎃</div>
-          <div style="font-size:21px;font-weight:800;margin-bottom:8px;">
-            TotoQuest Update Available!
-          </div>
-          <div style="
-            color:#c9b8f5;
-            font-size:13px;
-            line-height:1.45;
-            margin-bottom:20px;
-          ">
-            A new version of TotoQuest is ready. Update now to get the latest game changes.
-          </div>
-          <button id="totoquest-update-btn" style="
-            width:100%;
-            border:0;
-            border-radius:13px;
-            padding:13px 16px;
-            background:linear-gradient(135deg,#ff8a3d,#ff5f6d);
-            color:#fff;
-            font-size:15px;
-            font-weight:800;
-            cursor:pointer;
-            box-shadow:0 8px 20px rgba(255,100,60,.30);
-          ">
-            🔄 UPDATE NOW
-          </button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    document.getElementById('totoquest-update-btn').onclick = function () {
-      this.disabled = true;
-      this.textContent = 'Updating…';
-
-      // Force the newest index.html to be loaded rather than a stale
-      // document cached by the browser/PWA.
-      const url = new URL(window.location.href);
-      url.searchParams.set('totoquestUpdate', Date.now().toString());
-      window.location.replace(url.toString());
-    };
-  }
-
-  async function checkForUpdate() {
-    try {
-      const url = new URL('./index.html', window.location.href);
-      url.searchParams.set('totoquestUpdateCheck', Date.now().toString());
-
-      const response = await fetch(url.toString(), {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-
-      if (!response.ok) return;
-
-      const latestHtml = await response.text();
-      const match = latestHtml.match(
-        /<meta\s+name=["']totoquest-version["']\s+content=["']([^"']+)["']/i
-      );
-
-      if (!match) return;
-
-      const latestVersion = match[1];
-
-      if (latestVersion !== TOTOQUEST_VERSION) {
-        showUpdatePrompt();
-      }
-    } catch (e) {
-      console.log('TotoQuest update check skipped:', e);
-    }
-  }
-
-  // Register the service worker normally.
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('./sw.js')
-        .then(function (registration) {
-          // Ask the browser to check for a newer service-worker script.
-          registration.update().catch(function () {});
-        })
-        .catch(function (e) {
-          console.log('SW registration skipped:', e);
-        });
+  navigator.serviceWorker.register('sw.js').then(function(reg){
+    reg.update().catch(function(){});
+    document.addEventListener('visibilitychange', function(){
+      if (document.visibilityState === 'visible') reg.update().catch(function(){});
     });
-  }
 
-  // Check immediately when the app opens, then periodically while open.
-  window.addEventListener('load', function () {
-    setTimeout(checkForUpdate, 1500);
-    setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL);
+    function trackInstalling(worker){
+      worker.addEventListener('statechange', function(){
+        if (worker.state === 'installed' && navigator.serviceWorker.controller){
+          banner.classList.add('show');
+        }
+      });
+    }
+    if (reg.waiting && navigator.serviceWorker.controller) banner.classList.add('show');
+    if (reg.installing) trackInstalling(reg.installing);
+    reg.addEventListener('updatefound', function(){ trackInstalling(reg.installing); });
+  }).catch(function(e){ console.log('SW registration skipped:', e); });
+
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
+  banner.addEventListener('click', function(){
+    navigator.serviceWorker.getRegistration().then(function(reg){
+      if (reg && reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+    });
   });
 })();
 </script>
