@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#120c1f">
+<meta name="totoquest-version" content="2026.09.16.1">
+
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1317,12 +1319,133 @@
 })();
 </script>
 
+<!-- TotoQuest automatic update system -->
 <script>
+(function () {
+  const TOTOQUEST_VERSION = '2026.09.16.1';
+  const UPDATE_CHECK_INTERVAL = 60 * 1000;
+
+  function showUpdatePrompt() {
+    if (document.getElementById('totoquest-update-prompt')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'totoquest-update-prompt';
+    overlay.innerHTML = `
+      <div style="
+        position:fixed;
+        inset:0;
+        z-index:999999;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:20px;
+        background:rgba(10,8,20,.78);
+        backdrop-filter:blur(5px);
+        font-family:'Segoe UI',system-ui,sans-serif;
+      ">
+        <div style="
+          width:min(360px,100%);
+          background:linear-gradient(145deg,#2b1f47,#120c1f);
+          color:#fff;
+          border:2px solid #7b5cff;
+          border-radius:22px;
+          padding:24px 20px;
+          text-align:center;
+          box-shadow:0 18px 60px rgba(0,0,0,.55);
+        ">
+          <div style="font-size:42px;margin-bottom:6px;">🎃</div>
+          <div style="font-size:21px;font-weight:800;margin-bottom:8px;">
+            TotoQuest Update Available!
+          </div>
+          <div style="
+            color:#c9b8f5;
+            font-size:13px;
+            line-height:1.45;
+            margin-bottom:20px;
+          ">
+            A new version of TotoQuest is ready. Update now to get the latest game changes.
+          </div>
+          <button id="totoquest-update-btn" style="
+            width:100%;
+            border:0;
+            border-radius:13px;
+            padding:13px 16px;
+            background:linear-gradient(135deg,#ff8a3d,#ff5f6d);
+            color:#fff;
+            font-size:15px;
+            font-weight:800;
+            cursor:pointer;
+            box-shadow:0 8px 20px rgba(255,100,60,.30);
+          ">
+            🔄 UPDATE NOW
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('totoquest-update-btn').onclick = function () {
+      this.disabled = true;
+      this.textContent = 'Updating…';
+
+      // Force the newest index.html to be loaded rather than a stale
+      // document cached by the browser/PWA.
+      const url = new URL(window.location.href);
+      url.searchParams.set('totoquestUpdate', Date.now().toString());
+      window.location.replace(url.toString());
+    };
+  }
+
+  async function checkForUpdate() {
+    try {
+      const url = new URL('./index.html', window.location.href);
+      url.searchParams.set('totoquestUpdateCheck', Date.now().toString());
+
+      const response = await fetch(url.toString(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+
+      if (!response.ok) return;
+
+      const latestHtml = await response.text();
+      const match = latestHtml.match(
+        /<meta\s+name=["']totoquest-version["']\s+content=["']([^"']+)["']/i
+      );
+
+      if (!match) return;
+
+      const latestVersion = match[1];
+
+      if (latestVersion !== TOTOQUEST_VERSION) {
+        showUpdatePrompt();
+      }
+    } catch (e) {
+      console.log('TotoQuest update check skipped:', e);
+    }
+  }
+
+  // Register the service worker normally.
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function(){
-      navigator.serviceWorker.register('sw.js').catch(function(e){ console.log('SW registration skipped:', e); });
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js')
+        .then(function (registration) {
+          // Ask the browser to check for a newer service-worker script.
+          registration.update().catch(function () {});
+        })
+        .catch(function (e) {
+          console.log('SW registration skipped:', e);
+        });
     });
   }
+
+  // Check immediately when the app opens, then periodically while open.
+  window.addEventListener('load', function () {
+    setTimeout(checkForUpdate, 1500);
+    setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL);
+  });
+})();
 </script>
 </body>
 </html>
