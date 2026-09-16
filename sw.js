@@ -1,4 +1,4 @@
-const CACHE_NAME = 'TotoQuestTestServerV4';
+const CACHE_NAME = 'TotoQuestTestServerV5';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
