@@ -98,6 +98,7 @@
   .starter-card { background:var(--panel); border-radius:16px; padding:12px 6px; text-align:center; cursor:pointer; border:3px solid transparent; }
   .starter-card.sel { border-color: var(--accent); transform:translateY(-3px); }
   .starter-card .sp { font-size:34px; }
+  .starter-card .sp svg { width:1em; height:1.2em; vertical-align:middle; }
   .starter-card .nm { font-weight:800; font-size:10.5px; margin-top:4px; }
   .starter-card .nature { font-size:8.5px; color:#888; font-weight:700; text-transform:capitalize; }
 
@@ -123,6 +124,8 @@
   .deco { position:absolute; pointer-events:none; }
   .deco .counter-rot { display:inline-block; transform: translate(-50%,-100%) rotate(calc(-1 * var(--rot,0deg))); filter: drop-shadow(0 3px 2px rgba(0,0,0,0.2)); }
   .gym-radius { position:absolute; border:2px dashed rgba(255,255,255,0.6); border-radius:50%; transform: translate(-50%,-50%); pointer-events:none; }
+  .node-shadow { position:absolute; left:50%; bottom:1px; width:26px; height:9px; border-radius:50%; background:rgba(0,20,0,0.35); transform:translateX(-50%); filter:blur(1.5px); z-index:1; }
+  .deco-shadow { position:absolute; left:50%; bottom:-1px; border-radius:50%; background:rgba(0,20,0,0.3); transform:translateX(-50%); filter:blur(1px); z-index:1; }
 
   .player-pin { position:absolute; left:50%; top:58%; transform: translate(-50%,-100%); z-index:15; text-align:center; }
   .player-shadow { width:26px; height:9px; border-radius:50%; background:rgba(0,0,0,0.28); margin:2px auto 0; }
@@ -131,7 +134,7 @@
   @keyframes bob { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-4px);} }
 
   .toto-node, .gym-node { position:absolute; transform: translate(-50%,-100%); text-align:center; cursor:pointer; z-index:10; }
-  .node-spin { transform: rotate(calc(-1 * var(--rot,0deg))); }
+  .node-spin { position:relative; z-index:2; transform: rotate(calc(-1 * var(--rot,0deg))); }
   .toto-node .bubble, .gym-node .bubble { font-size:34px; animation: floaty 2.4s ease-in-out infinite; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.3)); }
   .toto-node .bubble svg, .gym-node .bubble svg { width:1em; height:1.2em; vertical-align:middle; }
   @keyframes floaty { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-7px);} }
@@ -568,16 +571,20 @@
   // ---------------- CREATURE ART (original designs — standing bodies, not flat emoji) ----------------
   function standingCreature(c){
     return '<svg class="creature-svg" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg">'
+      + '<ellipse cx="50" cy="105" rx="27" ry="5" fill="rgba(0,0,0,0.22)"/>'
       + '<ellipse cx="35" cy="97" rx="9" ry="6" fill="'+c.leg+'" class="cr-leg cr-legL"/>'
       + '<ellipse cx="65" cy="97" rx="9" ry="6" fill="'+c.leg+'" class="cr-leg cr-legR"/>'
       + '<ellipse cx="50" cy="74" rx="25" ry="23" fill="'+c.body+'" stroke="'+c.stroke+'" stroke-width="2.5"/>'
+      + '<ellipse cx="50" cy="87" rx="21" ry="9" fill="#000" opacity="0.1"/>'
       + '<ellipse cx="21" cy="70" rx="7" ry="10" fill="'+c.body+'" stroke="'+c.stroke+'" stroke-width="2" class="cr-arm cr-armL"/>'
       + '<ellipse cx="79" cy="70" rx="7" ry="10" fill="'+c.body+'" stroke="'+c.stroke+'" stroke-width="2" class="cr-arm cr-armR"/>'
       + '<circle cx="50" cy="35" r="26" fill="'+c.head+'" stroke="'+c.stroke+'" stroke-width="2.5"/>'
+      + '<ellipse cx="50" cy="47" rx="19" ry="7" fill="#000" opacity="0.08"/>'
       + c.accent
       + '<circle class="cr-eye" cx="41" cy="33" r="5" fill="'+c.eye+'"/>'
       + '<circle class="cr-eye" cx="59" cy="33" r="5" fill="'+c.eye+'"/>'
       + '<path d="M43,45 Q50,50 57,45" stroke="'+c.stroke+'" stroke-width="2.2" fill="none" stroke-linecap="round"/>'
+      + '<ellipse cx="38" cy="21" rx="11" ry="7" fill="#fff" opacity="0.35" transform="rotate(-20 38 21)"/>'
       + '</svg>';
   }
   const NATURE_SVG = {
@@ -598,39 +605,55 @@
   };
   const SPOOKY_SVG = {
     'Pumpkin Fiend': '<svg class="creature-svg" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg">'
+      + '<ellipse cx="50" cy="105" rx="27" ry="5" fill="rgba(0,0,0,0.22)"/>'
       + '<ellipse cx="35" cy="97" rx="9" ry="6" fill="#3a5c2e" class="cr-leg cr-legL"/>'
       + '<ellipse cx="65" cy="97" rx="9" ry="6" fill="#3a5c2e" class="cr-leg cr-legR"/>'
       + '<ellipse cx="50" cy="74" rx="25" ry="23" fill="#5c8a4a" stroke="#2e5c24" stroke-width="2.5"/>'
+      + '<ellipse cx="50" cy="87" rx="21" ry="9" fill="#000" opacity="0.1"/>'
       + '<ellipse cx="21" cy="70" rx="7" ry="10" fill="#5c8a4a" stroke="#2e5c24" stroke-width="2" class="cr-arm cr-armL"/>'
       + '<ellipse cx="79" cy="70" rx="7" ry="10" fill="#5c8a4a" stroke="#2e5c24" stroke-width="2" class="cr-arm cr-armR"/>'
       + '<line x1="50" y1="9" x2="50" y2="2" stroke="#3a5c2e" stroke-width="3"/>'
       + '<circle cx="50" cy="35" r="26" fill="#ff8a3d" stroke="#8a3a10" stroke-width="2.5"/>'
+      + '<ellipse cx="50" cy="47" rx="19" ry="7" fill="#000" opacity="0.08"/>'
       + '<path d="M32,32 Q50,25 68,32" stroke="#b85a1e" stroke-width="1.5" fill="none" opacity="0.5"/>'
       + '<path d="M32,38 Q50,44 68,38" stroke="#b85a1e" stroke-width="1.5" fill="none" opacity="0.5"/>'
       + '<path class="cr-eye" d="M36,29 L45,27 L40,39 Z" fill="#fff2b0"/>'
       + '<path class="cr-eye" d="M64,29 L55,27 L60,39 Z" fill="#fff2b0"/>'
       + '<path d="M38,45 L44,49 L48,44 L52,49 L56,44 L62,45" stroke="#fff2b0" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<ellipse cx="38" cy="21" rx="11" ry="7" fill="#fff" opacity="0.3" transform="rotate(-20 38 21)"/>'
       + '</svg>',
     'Grave Wisp': '<svg class="creature-svg" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg">'
+      + '<ellipse cx="50" cy="103" rx="24" ry="5" fill="rgba(0,0,0,0.18)"/>'
       + '<path d="M22,60 Q20,20 50,18 Q80,20 78,60 L78,95 L68,86 L58,97 L50,87 L42,97 L32,86 L22,95 Z" fill="#f4f4fb" stroke="#c9c9de" stroke-width="2.5" class="cr-ghost"/>'
+      + '<ellipse cx="50" cy="70" rx="18" ry="16" fill="#000" opacity="0.05"/>'
       + '<circle class="cr-eye" cx="40" cy="50" r="5" fill="#2a2a3a"/><circle class="cr-eye" cx="60" cy="50" r="5" fill="#2a2a3a"/>'
-      + '<ellipse cx="50" cy="64" rx="5" ry="7" fill="#2a2a3a"/></svg>',
+      + '<ellipse cx="50" cy="64" rx="5" ry="7" fill="#2a2a3a"/>'
+      + '<ellipse cx="38" cy="32" rx="10" ry="6" fill="#fff" opacity="0.5" transform="rotate(-15 38 32)"/>'
+      + '</svg>',
     'Bone Rattler': standingCreature({ body:'#f2f2e8', head:'#f7f7ee', leg:'#d8d8c8', stroke:'#8a8a78', eye:'#ff5040',
       accent:'<path d="M38,20 L38,30 M46,18 L46,32 M54,18 L54,32 M62,20 L62,30" stroke="#8a8a78" stroke-width="2" stroke-linecap="round"/>' }),
     'Web Stalker': '<svg class="creature-svg" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg">'
+      + '<ellipse cx="50" cy="99" rx="30" ry="5" fill="rgba(0,0,0,0.2)"/>'
       + '<g class="cr-legL" stroke="#2a2030" stroke-width="3" fill="none" stroke-linecap="round">'
       + '<path d="M38,60 L14,50 M38,66 L10,66 M38,72 L14,82 M38,78 L20,94"/></g>'
       + '<g class="cr-legR" stroke="#2a2030" stroke-width="3" fill="none" stroke-linecap="round">'
       + '<path d="M62,60 L86,50 M62,66 L90,66 M62,72 L86,82 M62,78 L80,94"/></g>'
       + '<circle cx="50" cy="66" r="26" fill="#4a2f6b" stroke="#2a1a44" stroke-width="2.5"/>'
+      + '<ellipse cx="50" cy="78" rx="20" ry="8" fill="#000" opacity="0.12"/>'
       + '<circle class="cr-eye" cx="42" cy="60" r="4.5" fill="#ff4040"/><circle class="cr-eye" cx="58" cy="60" r="4.5" fill="#ff4040"/>'
-      + '<circle class="cr-eye" cx="46" cy="70" r="3" fill="#ff4040"/><circle class="cr-eye" cx="54" cy="70" r="3" fill="#ff4040"/></svg>',
+      + '<circle class="cr-eye" cx="46" cy="70" r="3" fill="#ff4040"/><circle class="cr-eye" cx="54" cy="70" r="3" fill="#ff4040"/>'
+      + '<ellipse cx="40" cy="55" rx="9" ry="6" fill="#fff" opacity="0.25" transform="rotate(-20 40 55)"/>'
+      + '</svg>',
     'Night Bat': '<svg class="creature-svg" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg">'
+      + '<ellipse cx="50" cy="90" rx="20" ry="5" fill="rgba(0,0,0,0.18)"/>'
       + '<g class="toni-wing toni-wing-l"><path d="M45,55 C25,40 8,44 4,58 C14,56 26,60 38,68 Z" fill="#3c2a52" stroke="#241a35" stroke-width="2"/></g>'
       + '<g class="toni-wing toni-wing-r"><path d="M55,55 C75,40 92,44 96,58 C86,56 74,60 62,68 Z" fill="#3c2a52" stroke="#241a35" stroke-width="2"/></g>'
       + '<circle cx="50" cy="58" r="24" fill="#5c4373" stroke="#241a35" stroke-width="2.5"/>'
+      + '<ellipse cx="50" cy="68" rx="18" ry="7" fill="#000" opacity="0.1"/>'
       + '<path d="M38,38 L34,26 L44,36 Z" fill="#5c4373" stroke="#241a35" stroke-width="2"/><path d="M62,38 L66,26 L56,36 Z" fill="#5c4373" stroke="#241a35" stroke-width="2"/>'
-      + '<circle class="cr-eye" cx="42" cy="56" r="5" fill="#ff4040"/><circle class="cr-eye" cx="58" cy="56" r="5" fill="#ff4040"/></svg>'
+      + '<circle class="cr-eye" cx="42" cy="56" r="5" fill="#ff4040"/><circle class="cr-eye" cx="58" cy="56" r="5" fill="#ff4040"/>'
+      + '<ellipse cx="40" cy="48" rx="9" ry="6" fill="#fff" opacity="0.3" transform="rotate(-20 40 48)"/>'
+      + '</svg>'
   };
   function rand(seed){ const x = Math.sin(seed) * 10000; return x - Math.floor(x); }
   function uid(){ return 'id'+Date.now()+Math.floor(Math.random()*100000); }
@@ -663,12 +686,15 @@
   // Original artwork (not the reference photo) — a small animated inline SVG so she reads
   // clearly at any size, with fluttering wings, glowing eyes, and a pulsing staff orb.
   const TONI_SVG = '<svg class="toni-svg" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+    + '<ellipse cx="50" cy="113" rx="26" ry="5" fill="rgba(0,0,0,0.25)"/>'
     + '<g class="toni-wing toni-wing-l"><path d="M40,55 C20,38 4,44 2,60 C10,57 21,61 31,70 C35,64 38,59 40,55 Z" fill="#4a2f6b" stroke="#2c1a44" stroke-width="2"/><circle cx="15" cy="55" r="4" fill="#eaffea" opacity="0.85"/></g>'
     + '<g class="toni-wing toni-wing-r"><path d="M60,55 C80,38 96,44 98,60 C90,57 79,61 69,70 C65,64 62,59 60,55 Z" fill="#4a2f6b" stroke="#2c1a44" stroke-width="2"/><circle cx="85" cy="55" r="4" fill="#eaffea" opacity="0.85"/></g>'
     + '<path d="M35,78 C32,96 33,109 40,116 L60,116 C67,109 68,96 65,78 Z" fill="#3c2a52" stroke="#241a35" stroke-width="2"/>'
+    + '<ellipse cx="50" cy="100" rx="15" ry="10" fill="#000" opacity="0.12"/>'
     + '<line x1="21" y1="116" x2="29" y2="58" stroke="#6b4a2f" stroke-width="3" stroke-linecap="round"/>'
     + '<circle class="toni-orb" cx="29" cy="53" r="6" fill="#9b5cff"/>'
     + '<ellipse cx="50" cy="55" rx="26" ry="23" fill="#ff8a3d" stroke="#b85a1e" stroke-width="2.5"/>'
+    + '<ellipse cx="50" cy="67" rx="20" ry="7" fill="#000" opacity="0.1"/>'
     + '<path d="M32,55 Q50,47 68,55" stroke="#b85a1e" stroke-width="1.5" fill="none" opacity="0.5"/>'
     + '<path d="M32,57 Q50,65 68,57" stroke="#b85a1e" stroke-width="1.5" fill="none" opacity="0.5"/>'
     + '<path class="toni-eye" d="M36,51 L45,49 L40,59 Z" fill="#fff2b0"/>'
@@ -677,6 +703,7 @@
     + '<path d="M50,8 L29,45 Q50,39 71,45 Z" fill="#6b3fa0" stroke="#442868" stroke-width="2.5"/>'
     + '<ellipse cx="50" cy="45" rx="23" ry="5" fill="#6b3fa0" stroke="#442868" stroke-width="2.5"/>'
     + '<circle cx="50" cy="9" r="4.5" fill="#ff8a3d" stroke="#b85a1e" stroke-width="1.5"/>'
+    + '<ellipse cx="40" cy="46" rx="9" ry="6" fill="#fff" opacity="0.3" transform="rotate(-20 40 46)"/>'
     + '</svg>';
   function spriteMarkup(t){ return (t && t.isToni) ? TONI_SVG : (t ? t.sprite : ''); }
   function makeToniGuardian(){
@@ -727,7 +754,17 @@
   let dirty = false, saving = false, saveTimer = null;
   async function saveNow(force){
     if (!state.loggedIn || !state.email) return true;
-    if (saving){ dirty = true; return false; }
+    if (saving){
+      dirty = true;
+      if (!force) return false;
+      // A forced save (e.g. right after picking a starter) must not silently defer to the
+      // next autosave tick — wait for the in-flight save to finish, then save again so the
+      // latest state is guaranteed to be written before we return.
+      await new Promise(resolve=>{
+        const check = setInterval(()=>{ if (!saving){ clearInterval(check); resolve(); } }, 80);
+      });
+      return saveNow(true);
+    }
     saving = true;
     let ok = false;
     for (let attempt=0; attempt<3 && !ok; attempt++){
@@ -811,25 +848,30 @@
 
   // ---------------- STARTER SELECT (new accounts only) ----------------
   function makeStarterToto(natureKey){
-    const [name, sprite] = SPECIES[natureKey][0];
+    const [name] = SPECIES[natureKey][0];
     const cp = rollCP('normal'); const s = statsFromCp(cp);
-    return { id:uid(), name, sprite, tier:'normal', nature:natureKey, cp, level:1, maxHp:s.maxHp, hp:s.maxHp, atk:s.atk, strength:s.strength, def:s.def, spd:s.spd, maxEnergy:s.maxEnergy, energy:s.maxEnergy };
+    return { id:uid(), name, sprite: NATURE_SVG[natureKey], tier:'normal', nature:natureKey, cp, level:1, maxHp:s.maxHp, hp:s.maxHp, atk:s.atk, strength:s.strength, def:s.def, spd:s.spd, maxEnergy:s.maxEnergy, energy:s.maxEnergy };
   }
-  let chosenStarterNature = null;
   function showStarterSelect(){
     const grid = $('#starter-grid'); grid.innerHTML='';
-    chosenStarterNature = STARTER_NATURES[0];
     STARTER_NATURES.forEach((nature, i)=>{
-      const [name, sprite] = SPECIES[nature][0];
+      const [name] = SPECIES[nature][0];
       const card = document.createElement('div'); card.className='starter-card' + (i===0?' sel':'');
-      card.innerHTML = '<div class="sp">'+sprite+'</div><div class="nm">'+name+'</div><div class="nature">'+nature+'</div>';
-      card.onclick = ()=>{ $$('.starter-card').forEach(c=>c.classList.remove('sel')); card.classList.add('sel'); chosenStarterNature = nature; };
+      card.dataset.nature = nature;
+      card.innerHTML = '<div class="sp">'+NATURE_SVG[nature]+'</div><div class="nm">'+name+'</div><div class="nature">'+nature+'</div>';
+      card.onclick = ()=>{ $$('.starter-card').forEach(c=>c.classList.remove('sel')); card.classList.add('sel'); };
       grid.appendChild(card);
     });
     showScreen('starter');
   }
   $('#btn-confirm-starter').onclick = ()=>{
-    state.collection.push(makeStarterToto(chosenStarterNature || ELEMENTS[0]));
+    // Read the selection straight from the DOM at confirm-time — no separately-tracked
+    // variable that could ever drift out of sync with what's actually highlighted.
+    const selCard = $('#starter-grid .starter-card.sel') || $('#starter-grid .starter-card');
+    const nature = (selCard && selCard.dataset.nature) || STARTER_NATURES[0];
+    const starter = makeStarterToto(nature);
+    state.collection.push(starter);
+    showToast('Welcome, '+starter.name+'!');
     enterGame(true);
   };
 
@@ -1122,7 +1164,7 @@
   function appendTotoNode(t){
     const node = document.createElement('div'); node.className='toto-node';
     node.style.left=t._x+'px'; node.style.top=t._y+'px';
-    node.innerHTML = '<div class="node-spin"><div class="bubble">'+spriteMarkup(t)+'</div><div class="cp-tag">CP '+t.cp+'</div><div class="dist-tag">…m</div></div>';
+    node.innerHTML = '<div class="node-shadow"></div><div class="node-spin"><div class="bubble">'+spriteMarkup(t)+'</div><div class="cp-tag">CP '+t.cp+'</div><div class="dist-tag">…m</div></div>';
     t._distEl = node.querySelector('.dist-tag');
     node.onclick = ()=> tryStartEncounter(t);
     $('#toto-layer').appendChild(node);
@@ -1132,12 +1174,22 @@
     const ringPx = GYM_RADIUS_M*2*GPS_SCALE;
     ring.style.width=ringPx+'px'; ring.style.height=ringPx+'px'; ring.style.left=gym.x+'px'; ring.style.top=(gym.y-14)+'px';
     $('#gym-layer').appendChild(ring);
+    gym._ringEl = ring;
     const node = document.createElement('div'); node.className='gym-node';
     node.style.left=gym.x+'px'; node.style.top=gym.y+'px';
-    node.innerHTML = '<div class="node-spin"><div class="bubble">'+(gym.atPark?'🌳':'🏟️')+'</div><div class="gym-label">'+gym.name+'</div><div class="dist-tag">…m</div></div>';
+    node.innerHTML = '<div class="node-shadow"></div><div class="node-spin"><div class="bubble">'+(gym.atPark?'🌳':'🏟️')+'</div><div class="gym-label">'+gym.name+'</div><div class="dist-tag">…m</div></div>';
     gym._distEl = node.querySelector('.dist-tag');
+    gym._node = node;
     node.onclick = ()=> tryStartGymRaid(gym);
     $('#gym-layer').appendChild(node);
+  }
+  function refreshGymNode(gym){
+    if (gym._ringEl){ gym._ringEl.style.left = gym.x+'px'; gym._ringEl.style.top = (gym.y-14)+'px'; }
+    if (gym._node){
+      gym._node.style.left = gym.x+'px'; gym._node.style.top = gym.y+'px';
+      const bubble = gym._node.querySelector('.bubble');
+      if (bubble) bubble.textContent = gym.atPark ? '🌳' : '🏟️';
+    }
   }
 
   // ---------------- CHUNKED, NEVER-ENDING WORLD ----------------
@@ -1155,20 +1207,34 @@
   function ensureChunksLoaded(){
     if (!state.geoAnchor) return;
     const {cx, cy} = currentChunkCoords();
+    // Load the chunk you're standing in first — this is what makes the map feel instant —
+    // then the surrounding ring loads in behind it as a lower priority.
+    queueChunk(cx, cy, true);
     for (let dx=-1; dx<=1; dx++){
       for (let dy=-1; dy<=1; dy++){
-        const key = chunkKey(cx+dx, cy+dy);
-        if (!state.loadedChunks.has(key) && !chunkQueueSet.has(key)){
-          chunkQueue.push({key, cx:cx+dx, cy:cy+dy});
-          chunkQueueSet.add(key);
-        }
+        if (dx===0 && dy===0) continue;
+        queueChunk(cx+dx, cy+dy, false);
       }
     }
     processChunkQueue();
   }
+  function queueChunk(cx, cy, priority){
+    const key = chunkKey(cx, cy);
+    if (state.loadedChunks.has(key) || chunkQueueSet.has(key)) return;
+    chunkQueueSet.add(key);
+    const job = {key, cx, cy};
+    if (priority) chunkQueue.unshift(job); else chunkQueue.push(job);
+  }
+  const CHUNK_CONCURRENCY = 3; // load a few chunks at once instead of one-by-one
   async function processChunkQueue(){
     if (chunkLoading) return;
     chunkLoading = true;
+    const workers = [];
+    for (let i=0; i<CHUNK_CONCURRENCY; i++) workers.push(chunkWorker());
+    await Promise.all(workers);
+    chunkLoading = false;
+  }
+  async function chunkWorker(){
     while (chunkQueue.length){
       const job = chunkQueue.shift();
       chunkQueueSet.delete(job.key);
@@ -1176,7 +1242,6 @@
       state.loadedChunks.add(job.key);
       try { await loadChunk(job.cx, job.cy); } catch(e){ console.warn('chunk load failed', e); }
     }
-    chunkLoading = false;
   }
   async function loadChunk(cx, cy){
     const centerEast = (cx+0.5)*CHUNK_SIZE_M, centerNorth = (cy+0.5)*CHUNK_SIZE_M;
@@ -1192,14 +1257,16 @@
         const east = centerEast + (rand(s)-0.5)*CHUNK_SIZE_M;
         const north = centerNorth + (rand(s+1)-0.5)*CHUNK_SIZE_M;
         const pos = worldPosFromMeters(east, north);
+        const size = 18+rand(s+2)*16;
         const el = document.createElement('div'); el.className='deco';
         el.style.left = pos.x+'px'; el.style.top = pos.y+'px';
-        el.innerHTML = '<span class="counter-rot" style="display:inline-block; font-size:'+(18+rand(s+2)*16)+'px;">'+decoEmojis[Math.floor(rand(s+3)*decoEmojis.length)]+'</span>';
+        el.innerHTML = '<div class="deco-shadow" style="width:'+(size*0.7)+'px; height:'+(size*0.28)+'px;"></div>'
+          + '<span class="counter-rot" style="position:relative; z-index:2; display:inline-block; font-size:'+size+'px;">'+decoEmojis[Math.floor(rand(s+3)*decoEmojis.length)]+'</span>';
         decoLayer.appendChild(el);
       }
     }
 
-    // wild Totos for this chunk
+    // wild Totos for this chunk — spawn immediately, don't wait on the network
     if (state.wildTotos.length < MAX_WILD_TOTOS){
       const wildCount = 1 + Math.floor(rand(baseSeed+50)*2);
       for (let i=0;i<wildCount;i++){
@@ -1214,28 +1281,30 @@
       }
     }
 
-    const wantsGym = state.gyms.length < MAX_GYMS && rand(baseSeed+90) < 0.22;
-
-    // Live roads/buildings/parks/water for this chunk — this is what makes the map match reality.
-    let parks = [];
-    try { parks = await fetchChunkTerrain(lat, lon); } catch(e){ console.warn('terrain fetch failed', e); }
-
-    if (wantsGym){
-      let pos, atPark = false;
-      if (parks.length){
-        pos = parks[Math.floor(rand(baseSeed+95)*parks.length)];
-        atPark = true;
-      } else {
-        const east = centerEast + (rand(baseSeed+91)-0.5)*CHUNK_SIZE_M*0.6;
-        const north = centerNorth + (rand(baseSeed+92)-0.5)*CHUNK_SIZE_M*0.6;
-        pos = worldPosFromMeters(east, north);
-      }
+    // Gym spawns immediately at a walkable fallback spot — no waiting on the network for it
+    // to appear — then quietly slides onto a real nearby park if the terrain fetch finds one.
+    let gym = null;
+    if (state.gyms.length < MAX_GYMS && rand(baseSeed+90) < 0.22){
+      const east = centerEast + (rand(baseSeed+91)-0.5)*CHUNK_SIZE_M*0.6;
+      const north = centerNorth + (rand(baseSeed+92)-0.5)*CHUNK_SIZE_M*0.6;
+      const pos = worldPosFromMeters(east, north);
       const boss = makeToto(rand(baseSeed+93)<0.5 ? 'legendary' : 'mythical');
-      const gym = { id:uid(), x:pos.x, y:pos.y, boss, name: GYM_NAMES[Math.floor(rand(baseSeed+94)*GYM_NAMES.length)], atPark };
+      gym = { id:uid(), x:pos.x, y:pos.y, boss, name: GYM_NAMES[Math.floor(rand(baseSeed+94)*GYM_NAMES.length)], atPark:false };
       state.gyms.push(gym);
       appendGymNode(gym);
       renderBattleList();
     }
+
+    // Live roads/buildings/parks/water for this chunk — this is what makes the map match
+    // reality, drawn in on top once it arrives without blocking anything above.
+    try {
+      const parks = await fetchChunkTerrain(lat, lon);
+      if (gym && parks.length){
+        const spot = parks[Math.floor(rand(baseSeed+95)*parks.length)];
+        gym.x = spot.x; gym.y = spot.y; gym.atPark = true;
+        refreshGymNode(gym);
+      }
+    } catch(e){ console.warn('terrain fetch failed', e); }
 
     refreshNodeDistances();
   }
@@ -1255,19 +1324,18 @@
       +'way["waterway"="stream"]('+bbox+');'
       +');out geom;';
     const endpoints = ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 8000);
     let data = null;
-    for (const base of endpoints){
-      const url = base+'?data='+encodeURIComponent(query);
-      const ctrl = new AbortController();
-      const timer = setTimeout(()=>ctrl.abort(), 9000);
-      try {
-        const resp = await fetch(url, {signal: ctrl.signal});
-        clearTimeout(timer);
-        if (!resp.ok) throw new Error('bad status '+resp.status);
-        data = await resp.json();
-        break;
-      } catch(e){ clearTimeout(timer); console.warn('terrain endpoint failed, trying next:', e); }
-    }
+    // Race both mirrors and use whichever answers first, instead of trying one at a
+    // time — this is the biggest single win for how long a new area takes to appear.
+    try {
+      data = await Promise.any(endpoints.map(base=>
+        fetch(base+'?data='+encodeURIComponent(query), {signal: ctrl.signal})
+          .then(resp=>{ if (!resp.ok) throw new Error('bad status '+resp.status); return resp.json(); })
+      ));
+    } catch(e){ console.warn('all terrain endpoints failed:', e); }
+    clearTimeout(timer);
     if (!data || !data.elements || !data.elements.length) return [];
 
     const project = (la, lo)=>{ const md = metersDelta(state.geoAnchor.lat, state.geoAnchor.lon, la, lo); return worldPosFromMeters(md.east, md.north); };
@@ -1674,6 +1742,10 @@
 </script>
 
 <div id="tq-update-banner">🔄 A new version of TotoQuest is available — tap to update</div>
+<style>
+  #tq-update-banner.updating { background:linear-gradient(135deg,#4d7cff,#7b5cff); cursor:default; }
+  #tq-update-banner.updated { background:linear-gradient(135deg,#4dbf4d,#2e9e2e); cursor:default; }
+</style>
 <script>
 (function(){
   if (!('serviceWorker' in navigator)) return;
@@ -1712,24 +1784,29 @@
   });
 
   banner.addEventListener('click', function(){
-    banner.textContent = '🔄 Updating…';
-    var didReload = false;
-    function forceReload(){
-      if (didReload) return;
-      didReload = true;
-      window.location.reload();
+    if (banner.dataset.busy === '1') return; // ignore repeat taps mid-update
+    banner.dataset.busy = '1';
+    banner.classList.add('updating');
+    banner.textContent = '🔄 Updating… hang tight';
+
+    var finished = false;
+    function finishAndReload(){
+      if (finished) return;
+      finished = true;
+      banner.classList.remove('updating');
+      banner.classList.add('updated');
+      banner.textContent = '✅ Updated! Restarting the app…';
+      setTimeout(function(){ window.location.reload(); }, 700);
     }
-    navigator.serviceWorker.getRegistration().then(function(reg){
-      if (reg && reg.waiting){
-        reg.waiting.postMessage('SKIP_WAITING');
-        // controllerchange will normally reload us — but guarantee it happens either way.
-        setTimeout(forceReload, 1200);
-      } else {
-        // Nothing waiting (it may have already activated itself in the background,
-        // which can happen on a standalone/home-screen launch) — just reload now.
-        forceReload();
-      }
-    }).catch(forceReload);
+
+    try {
+      navigator.serviceWorker.getRegistration().then(function(reg){
+        if (reg && reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+        setTimeout(finishAndReload, 900);
+      }).catch(finishAndReload);
+    } catch(e){ finishAndReload(); }
+    // Absolute last-resort fallback so a tap can never end up doing nothing.
+    setTimeout(finishAndReload, 3000);
   });
 })();
 </script>
