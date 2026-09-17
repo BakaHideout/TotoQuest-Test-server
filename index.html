@@ -732,6 +732,14 @@
   // preview) and localStorage (works everywhere, incl. the downloaded standalone
   // app). We use whichever is actually available so the same file works both ways.
   const hasCloudStorage = (typeof window.storage !== 'undefined');
+  // Optional real cross-device leaderboard backend. A static GitHub Pages site has no
+  // server of its own, so without this the leaderboard can only ever show your own
+  // device. Paste your own free Firebase Realtime Database URL below to turn on a real
+  // shared leaderboard for the downloaded/GitHub-hosted version too — see the README in
+  // the app bundle for the 2-minute setup. Leave it blank to keep current behavior
+  // (shared only when played through the hosted Claude link).
+  const FIREBASE_DB_URL = ''; // e.g. 'https://your-project-default-rtdb.firebaseio.com'
+  function firebaseKeyFor(email){ return email.replace(/[.#$\[\]/]/g, '_'); }
   async function rawGet(key){
     if (hasCloudStorage){
       try { const res = await window.storage.get(key, false); return (res && res.value) ? res.value : null; }
@@ -900,39 +908,58 @@
     updateLeaderboard();
   }
   async function updateLeaderboard(){
-    if (!hasCloudStorage || !state.loggedIn) return;
+    if (!state.loggedIn) return;
+    const entry = { email: state.email, username: state.username, avatar: state.avatar, powerLevel: state.powerLevel };
+    if (FIREBASE_DB_URL){
+      try {
+        await fetch(FIREBASE_DB_URL+'/leaderboard/'+firebaseKeyFor(state.email)+'.json', {
+          method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(entry)
+        });
+        return;
+      } catch(e){ console.warn('firebase leaderboard update failed', e); }
+    }
+    if (!hasCloudStorage) return;
     try {
       const cur = await window.storage.get('totoquest-leaderboard', true);
       let board = {};
       if (cur && cur.value){ try { board = JSON.parse(cur.value); } catch(e){ board={}; } }
-      board[state.email] = { username: state.username, avatar: state.avatar, powerLevel: state.powerLevel };
+      board[state.email] = entry;
       await window.storage.set('totoquest-leaderboard', JSON.stringify(board), true);
     } catch(e){ console.warn('leaderboard update failed', e); }
   }
   async function loadLeaderboard(){
     const list = $('#leaderboard-list');
-    if (!hasCloudStorage){
-      list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Cross-player leaderboards need the hosted Claude version — this downloaded copy can only show your own power level: <b>'+(state.powerLevel||0).toLocaleString()+'</b>.</p>';
+    list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Loading…</p>';
+    let rows = [];
+    if (FIREBASE_DB_URL){
+      try {
+        const res = await fetch(FIREBASE_DB_URL+'/leaderboard.json');
+        const board = await res.json();
+        rows = board ? Object.values(board) : [];
+      } catch(e){ console.warn('firebase leaderboard load failed', e); list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Could not reach the leaderboard server.</p>'; return; }
+    } else if (hasCloudStorage){
+      try {
+        const res = await window.storage.get('totoquest-leaderboard', true);
+        let board = {};
+        if (res && res.value){ try { board = JSON.parse(res.value); } catch(e){} }
+        rows = Object.values(board);
+      } catch(e){ list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Could not load the leaderboard right now.</p>'; return; }
+    } else {
+      list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">This copy has no shared leaderboard server configured yet — showing just you: <b>'+(state.powerLevel||0).toLocaleString()+'</b>. See the app&#39;s README to turn on a real cross-device leaderboard (free, ~2 minutes).</p>';
       return;
     }
-    list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Loading…</p>';
-    try {
-      const res = await window.storage.get('totoquest-leaderboard', true);
-      let board = {};
-      if (res && res.value){ try { board = JSON.parse(res.value); } catch(e){} }
-      const rows = Object.entries(board).map(([email,v])=>({email, ...v})).sort((a,b)=>b.powerLevel-a.powerLevel);
-      if (!rows.length){ list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">No trainers on the board yet.</p>'; return; }
-      list.innerHTML = rows.map((r,i)=>{
-        const isMe = r.email===state.email;
-        const av = r.avatar==='male' ? '🧙‍♂️' : '🧙‍♀️';
-        return '<div class="toto-card" style="display:flex; align-items:center; gap:10px; text-align:left; margin-bottom:8px;'+(isMe?' border:2px solid #ff8a3d;':'')+'">'+
-          '<div style="font-weight:800; width:22px;">'+(i+1)+'</div>'+
-          '<div style="font-size:24px;">'+av+'</div>'+
-          '<div style="flex:1;"><div class="nm" style="font-size:13px;">'+r.username+(isMe?' (you)':'')+'</div></div>'+
-          '<div style="font-weight:800; color:#ff8a3d;">'+r.powerLevel.toLocaleString()+'</div>'+
-        '</div>';
-      }).join('');
-    } catch(e){ list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">Could not load the leaderboard right now.</p>'; }
+    rows.sort((a,b)=>b.powerLevel-a.powerLevel);
+    if (!rows.length){ list.innerHTML = '<p style="color:#999; font-weight:700; font-size:12.5px;">No trainers on the board yet.</p>'; return; }
+    list.innerHTML = rows.map((r,i)=>{
+      const isMe = r.email===state.email;
+      const av = r.avatar==='male' ? '🧙‍♂️' : '🧙‍♀️';
+      return '<div class="toto-card" style="display:flex; align-items:center; gap:10px; text-align:left; margin-bottom:8px;'+(isMe?' border:2px solid #ff8a3d;':'')+'">'+
+        '<div style="font-weight:800; width:22px;">'+(i+1)+'</div>'+
+        '<div style="font-size:24px;">'+av+'</div>'+
+        '<div style="flex:1;"><div class="nm" style="font-size:13px;">'+r.username+(isMe?' (you)':'')+'</div></div>'+
+        '<div style="font-weight:800; color:#ff8a3d;">'+r.powerLevel.toLocaleString()+'</div>'+
+      '</div>';
+    }).join('');
   }
 
   // ---------------- GEO / WORLD / CAMERA ----------------
@@ -1166,8 +1193,38 @@
     node.style.left=t._x+'px'; node.style.top=t._y+'px';
     node.innerHTML = '<div class="node-shadow"></div><div class="node-spin"><div class="bubble">'+spriteMarkup(t)+'</div><div class="cp-tag">CP '+t.cp+'</div><div class="dist-tag">…m</div></div>';
     t._distEl = node.querySelector('.dist-tag');
+    t._node = node;
     node.onclick = ()=> tryStartEncounter(t);
     $('#toto-layer').appendChild(node);
+  }
+  const RESPAWN_DELAY_MS = 3*60*1000; // a caught spot re-spawns something after ~3 minutes
+  const AMBIENT_SPAWN_INTERVAL_MS = 55*1000; // new wild Totos trickle in near you as you keep walking
+  function removeTotoFromMap(t){
+    const idx = state.wildTotos.indexOf(t);
+    if (idx>=0) state.wildTotos.splice(idx,1);
+    if (t._node && t._node.parentNode) t._node.parentNode.removeChild(t._node);
+  }
+  function spawnWildTotoAt(x, y, chunkKey){
+    if (state.wildTotos.length >= MAX_WILD_TOTOS) return;
+    const t = makeToto('normal');
+    t._x = x; t._y = y; t._chunkKey = chunkKey;
+    state.wildTotos.push(t);
+    appendTotoNode(t);
+    refreshNodeDistances();
+  }
+  if (!window.__totoAmbientSpawnTimer){
+    window.__totoAmbientSpawnTimer = setInterval(()=>{
+      if (!state.geoAnchor || !state.playerWorldPos) return;
+      // Small chance of a fresh spawn appearing somewhere near your current position —
+      // the "as you walk more, more appear" behavior, independent of catching anything.
+      if (Math.random() < 0.55 && state.wildTotos.length < MAX_WILD_TOTOS){
+        const ang = Math.random()*Math.PI*2;
+        const distM = 60 + Math.random()*160; // 60-220m away
+        const px = state.playerWorldPos.x + Math.cos(ang)*distM*GPS_SCALE;
+        const py = state.playerWorldPos.y + Math.sin(ang)*distM*GPS_SCALE;
+        spawnWildTotoAt(px, py, null);
+      }
+    }, AMBIENT_SPAWN_INTERVAL_MS);
   }
   function appendGymNode(gym){
     const ring = document.createElement('div'); ring.className='gym-radius';
@@ -1275,7 +1332,7 @@
         const north = centerNorth + (rand(s+1)-0.5)*CHUNK_SIZE_M;
         const pos = worldPosFromMeters(east, north);
         const t = makeToto('normal');
-        t._x = pos.x; t._y = pos.y;
+        t._x = pos.x; t._y = pos.y; t._chunkKey = chunkKey(cx, cy);
         state.wildTotos.push(t);
         appendTotoNode(t);
       }
@@ -1478,11 +1535,16 @@
   $$('[data-close-enc]').forEach(x=> x.onclick = ()=>{ $('#encounter-modal').classList.remove('active'); pendingCatch=null; });
   $('#btn-throw').onclick = ()=>{
     if (!pendingCatch) return;
-    state.collection.push(pendingCatch);
-    showToast('Caught '+pendingCatch.name+'!');
+    const caught = pendingCatch;
+    const respawnX = caught._x, respawnY = caught._y, respawnChunk = caught._chunkKey;
+    state.collection.push(caught);
+    removeTotoFromMap(caught);
+    showToast('Caught '+caught.name+'!');
     renderCollection(); refreshHUD(); markDirty(); saveNow(false);
     $('#encounter-modal').classList.remove('active');
     pendingCatch = null;
+    // Something new will turn up at roughly this same spot after a few minutes.
+    setTimeout(()=>{ spawnWildTotoAt(respawnX, respawnY, respawnChunk); }, RESPAWN_DELAY_MS);
   };
   function tryStartGymRaid(gym){
     const distM = distanceMetersToWorldPoint(gym.x, gym.y);
@@ -1612,6 +1674,20 @@
 
   // ================= BATTLE SCREEN =================
   let battle = null;
+  // Percentage-based mitigation with a per-hit cap, instead of flat atk-minus-def — this is
+  // what keeps a fight from being decided in one or two hits when CP levels are far apart,
+  // and lets us deliberately pace gym/challenger raids to run longer than a wild scuffle.
+  function damageCapPct(mode){
+    if (mode==='catch') return 0.34;
+    if (mode==='challenge') return 0.11;
+    return 0.15; // gym raids (solo/group)
+  }
+  function computeDamage(attackPower, defenderDef, defenderMaxHp, capPct){
+    const mitigated = attackPower * (70/(70+defenderDef));
+    let dmg = mitigated * (0.85 + Math.random()*0.3);
+    dmg = Math.min(dmg, defenderMaxHp*capPct);
+    return Math.max(2, Math.round(dmg));
+  }
   function fighterFromToto(t){
     return { ref:t, name:t.name, sprite:spriteMarkup(t), level:t.level, cp:t.cp, tier:t.tier, maxHp:t.maxHp, hp:t.maxHp, atk:t.atk, strength:t.strength, def:t.def, spd:t.spd, maxEnergy:t.maxEnergy, energy:t.maxEnergy, isToni:!!t.isToni };
   }
@@ -1619,7 +1695,13 @@
 
   function launchBattle(opts){
     const lead = strongestToto(); if (!lead) return;
-    battle = { mode:opts.mode, shrineName:opts.shrineName||null, player:fighterFromToto(lead), enemy:fighterFromToto(opts.opponent), opponentTemplate:opts.opponent, allies:opts.allies||[], group:(opts.allies&&opts.allies.length>0), over:false, timers:{} };
+    const enemyFighter = fighterFromToto(opts.opponent);
+    // Gym champions and especially Challenger guardians fight tougher than their catchable
+    // stats — this only affects the battle copy, so the Toto you actually catch afterward
+    // has completely normal health for its tier, not this temporary raid buff.
+    if (opts.mode==='solo' || opts.mode==='group'){ enemyFighter.maxHp = Math.round(enemyFighter.maxHp*1.6); enemyFighter.hp = enemyFighter.maxHp; }
+    else if (opts.mode==='challenge'){ enemyFighter.maxHp = Math.round(enemyFighter.maxHp*2.4); enemyFighter.hp = enemyFighter.maxHp; }
+    battle = { mode:opts.mode, shrineName:opts.shrineName||null, player:fighterFromToto(lead), enemy:enemyFighter, opponentTemplate:opts.opponent, allies:opts.allies||[], group:(opts.allies&&opts.allies.length>0), over:false, timers:{} };
     $('#battle-title').textContent = opts.mode==='catch' ? 'Wild Encounter' : (opts.shrineName ? (opts.shrineName+' Raid') : 'Raid');
     $('#battle-stage').className = 'battle-stage ' + (opts.mode==='catch' ? 'theme-catch' : 'theme-raid');
     spawnEmbers();
@@ -1668,7 +1750,7 @@
     const enemyDelay = Math.max(500, 1500 - battle.enemy.spd*4);
     battle.timers.enemyTimer = setInterval(()=>{
       if (!battle || battle.over) return;
-      let dmg = Math.max(2, Math.round((battle.enemy.atk+battle.enemy.strength) - battle.player.def*0.5 + (Math.random()*8-4)));
+      let dmg = computeDamage(battle.enemy.atk+battle.enemy.strength, battle.player.def, battle.player.maxHp, damageCapPct(battle.mode));
       if (battle.group) dmg = Math.round(dmg*0.6);
       battle.player.hp = Math.max(0, battle.player.hp - dmg);
       flashSprite('p'); popDamage('p', dmg, '#ff5470'); renderBattle();
@@ -1698,9 +1780,8 @@
     if (!battle || battle.over) return;
     const cost = 10; let weak=false;
     if (battle.player.energy < cost) weak=true; else battle.player.energy -= cost;
-    let dmg = Math.round((battle.player.atk+battle.player.strength) - battle.enemy.def*0.5 + (Math.random()*8-4));
+    let dmg = computeDamage(battle.player.atk+battle.player.strength, battle.enemy.def, battle.enemy.maxHp, damageCapPct(battle.mode));
     if (weak) dmg = Math.round(dmg*0.35);
-    dmg = Math.max(2, dmg);
     battle.enemy.hp = Math.max(0, battle.enemy.hp-dmg);
     flashSprite('e'); popDamage('e', dmg, '#fff'); renderBattle();
     battleLog(weak ? 'Low energy! Weak hit for '+dmg+'.' : 'You strike for '+dmg+'!');
