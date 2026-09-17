@@ -1712,9 +1712,24 @@
   });
 
   banner.addEventListener('click', function(){
+    banner.textContent = '🔄 Updating…';
+    var didReload = false;
+    function forceReload(){
+      if (didReload) return;
+      didReload = true;
+      window.location.reload();
+    }
     navigator.serviceWorker.getRegistration().then(function(reg){
-      if (reg && reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
-    });
+      if (reg && reg.waiting){
+        reg.waiting.postMessage('SKIP_WAITING');
+        // controllerchange will normally reload us — but guarantee it happens either way.
+        setTimeout(forceReload, 1200);
+      } else {
+        // Nothing waiting (it may have already activated itself in the background,
+        // which can happen on a standalone/home-screen launch) — just reload now.
+        forceReload();
+      }
+    }).catch(forceReload);
   });
 })();
 </script>
